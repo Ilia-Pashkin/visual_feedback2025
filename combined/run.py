@@ -2,6 +2,7 @@ import pybullet as p
 import numpy as np
 from camera import Camera
 import cv2
+import time
 
 IMG_SIDE = 300
 IMG_HALF = IMG_SIDE/2
@@ -52,13 +53,27 @@ p.setGravity(0,0,-10)
 boxId = p.loadURDF("./robot.urdf.xml", useFixedBase=True)
 
 # add aruco cube and aruco texture
-c = p.loadURDF('aruco.urdf', (0.5, 0.5, 0.0), useFixedBase=True)
+c = p.loadURDF('aruco.urdf', (0.7, 0.6, 0.0), useFixedBase=True)
 x = p.loadTexture('aruco_cube.png')
 p.changeVisualShape(c, -1, textureUniqueId=x)
 
+time.sleep(1)
+
+targetPosition = [0.6, 0.5, 1.0]
+start_position = [0.8, 0.6, 1.0]
+
+ik_target = p.calculateInverseKinematics(boxId, 
+                                         eefLinkIdx, 
+                                         targetPosition=targetPosition,
+                                         targetOrientation=p.getQuaternionFromEuler([0.0, 0.0, 1.6]))
+
 # go to the desired position
-p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetPositions=[0.0, 1.5708, 0.0], controlMode=p.POSITION_CONTROL)
+p.setJointMotorControlArray(bodyIndex=boxId, 
+                            jointIndices=jointIndices, 
+                            targetPositions=ik_target, 
+                            controlMode=p.POSITION_CONTROL)
 for _ in range(100):
+    time.sleep(0.02)
     p.stepSimulation()
 
 # get aruco coordinates in the desired position
@@ -68,10 +83,20 @@ corners, markerIds, rejectedCandidates = detector.detectMarkers(img)
 sd0 = np.reshape(np.array(corners[0][0]),(8,1))
 sd0 = np.array([(s-IMG_HALF)/IMG_HALF for s in sd0])
 sd = np.reshape(np.array(corners[0][0]),(8,1)).astype(int)
+print()
+
+ik_start = p.calculateInverseKinematics(boxId, 
+                                        eefLinkIdx, 
+                                        targetPosition=start_position,
+                                        targetOrientation=p.getQuaternionFromEuler([0.0, 0.0, 2.0]))
 
 # go to the starting position
-p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetPositions=[0.1, 1.4708, 0.1], controlMode=p.POSITION_CONTROL)
+p.setJointMotorControlArray(bodyIndex=boxId, 
+                            jointIndices=jointIndices, 
+                            targetPositions=ik_start, 
+                            controlMode=p.POSITION_CONTROL)
 for _ in range(100):
+    time.sleep(0.02)
     p.stepSimulation()
 
 camCount = 0
@@ -115,4 +140,5 @@ for t in logTime[1:]:
     dq[2] = -dq[2]
     p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=jointIndices, targetVelocities=dq, controlMode=p.VELOCITY_CONTROL)
 
+time.sleep(1000)
 p.disconnect()
